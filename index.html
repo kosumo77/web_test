@@ -26,16 +26,42 @@
         <main class="main-content">
             <header>
                 <h1>Hypixel AH Flip Finder</h1>
-                <p>サイドバーからアイテムを選択するか、下のボタンから全フリップ情報を取得します。</p>
-                <button id="display-flips-btn" class="header-btn">全フリップを表示</button>
+                <p>左のリストからアイテムの相場を検索するか、下のボタンで利益の出るフリップを分析します。</p>
+                <button id="analyze-flips-btn" class="header-btn">フリップを分析</button>
             </header>
-            <div id="result-container">
-                <h2 id="result-item-name">結果</h2>
-                <p id="status-message">アイテムを選択するか、「全フリップを表示」ボタンを押してください。</p>
-                <table id="result-table">
+            
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="auction-browser">オークション閲覧</button>
+                <button class="tab-btn" data-tab="flip-analyzer">フリップ分析</button>
+            </div>
+
+            <p id="status-message">アプリケーションを初期化中...</p>
+
+            <!-- Auction Browser Tab -->
+            <div id="auction-browser" class="tab-content active">
+                <h2>オークション閲覧</h2>
+                <table id="auction-table">
                     <thead>
                         <tr>
-                            <tr>
+                            <th>アイテム名</th>
+                            <th>価格</th>
+                            <th>エンチャント</th>
+                            <th>残り時間</th>
+                            <th>出品者</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Auction items will be displayed here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Flip Analyzer Tab -->
+            <div id="flip-analyzer" class="tab-content">
+                <h2>フリップ分析結果</h2>
+                <table id="flip-table">
+                    <thead>
+                        <tr>
                             <th>アイテム名</th>
                             <th>最安値</th>
                             <th>2番目に安い価格</th>
@@ -44,10 +70,9 @@
                             <th>売却先</th>
                             <th>エンチャント</th>
                         </tr>
-                        </tr>
                     </thead>
                     <tbody>
-                        <!-- 結果はここに表示されます -->
+                        <!-- Flip results will be displayed here -->
                     </tbody>
                 </table>
             </div>
