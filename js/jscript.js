@@ -301,7 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
     itemSearchEl.addEventListener('input', applyFilters);
     categoryFilterEl.addEventListener('change', applyFilters);
     rarityFilterEl.addEventListener('change', applyFilters);
-    analyzeFlipsBtn.addEventListener('click', handleAnalyzeFlips);
+    
+    // Add null check for analyzeFlipsBtn
+    if (analyzeFlipsBtn) {
+        analyzeFlipsBtn.addEventListener('click', handleAnalyzeFlips);
+    }
 
     // --- INITIAL LOAD ---
     init();
