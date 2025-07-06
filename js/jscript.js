@@ -20,7 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAllItems() {
         try {
             const response = await fetch('https://api.slothpixel.me/api/skyblock/items');
-            if (!response.ok) throw new Error('Failed to fetch item list');
+            if (!response.ok) {
+                throw new Error(`APIの応答が不正です。ステータス: ${response.status} ${response.statusText}`);
+            }
             const itemsData = await response.json();
             allItems = Object.entries(itemsData).map(([id, data]) => ({
                 id,
@@ -32,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFilters();
         } catch (error) {
             console.error("Failed to fetch item list:", error);
-            statusMessageEl.textContent = 'アイテムリストの取得に失敗しました。';
+            statusMessageEl.textContent = `アイテムリストの取得に失敗しました: ${error.message}`;
         }
     }
 
