@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Constants
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
-    const HYPIXEL_API_KEY = 'd2a69c60-079c-44a4-bac1-f61bb3411ed9'; // <--- ここにAPIキーを設定
+    const HYPIXEL_API_KEY = 'd2a69c60-079c-44a4-bac1-f61bb3411ed9';
+    const FLIPS_STORAGE_KEY = 'profitableFlips';
 
     // State
     let allItems = [];
@@ -228,9 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (allFlips.length > 0) {
             statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。`;
+            localStorage.setItem(FLIPS_STORAGE_KEY, JSON.stringify(allFlips)); // Save to localStorage
             displayFlipsInTable(allFlips);
         } else {
             statusMessageEl.textContent = '利益の出るフリップは見つかりませんでした。';
+            localStorage.removeItem(FLIPS_STORAGE_KEY); // Clear storage if no flips found
             resultTableBodyEl.innerHTML = '<tr><td colspan="6">-</td></tr>';
         }
 
@@ -302,6 +305,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function loadSavedFlips() {
+        const savedFlips = localStorage.getItem(FLIPS_STORAGE_KEY);
+        if (savedFlips) {
+            resultTableNameEl.textContent = "保存されたフリップ情報";
+            statusMessageEl.textContent = `前回保存した ${JSON.parse(savedFlips).length} 件のフリップ情報を表示しています。`;
+            displayFlipsInTable(JSON.parse(savedFlips));
+        }
+    }
+
     // --- EVENT LISTENERS ---
     itemSearchEl.addEventListener('input', applyFilters);
     categoryFilterEl.addEventListener('change', applyFilters);
@@ -310,4 +322,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIAL LOAD ---
     fetchAllItems();
+    loadSavedFlips();
 });
