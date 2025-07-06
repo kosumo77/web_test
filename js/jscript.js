@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // State
     let allItems = [];
+    let tradeableAuctions = [];
 
     // --- DATA FETCHING ---
     async function fetchAllItems() {
@@ -32,25 +33,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!itemsData.success) {
                  throw new Error('Item API call was not successful.');
             }
+            // Set master list of all items
             allItems = itemsData.items.map(item => ({
                 id: item.id,
                 name: item.name,
                 category: item.category || 'MISC',
                 tier: item.tier || 'COMMON'
             }));
-            populateFilters();
-            applyFilters();
         } catch (error) {
             console.error("Failed to fetch item list:", error);
             statusMessageEl.textContent = `アイテムリストの取得に失敗しました: ${error.message}`;
+            throw error; // Re-throw to be caught by init
         }
     }
 
-    async function getAuctions() {
+    async function getAndFilterAuctions() {
         statusMessageEl.textContent = 'APIから全オークションを取得中... (数分かかる場合があります)';
         try {
             const allAuctions = await fetchAllAuctionPages();
-            return allAuctions;
+            // Filter out soulbound items and return
+            return allAuctions.filter(auc => !auc.item_lore.includes('Soulbound'));
         } catch (error) {
             console.error('Failed to fetch all auctions:', error);
             statusMessageEl.textContent = `オークションデータの取得に失敗しました: ${error.message}`;
@@ -121,18 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyFilters() {
         const searchTerm = itemSearchEl.value.toLowerCase();
-        if (searchTerm === '') {
-            displayItems(allItems);
-            return;
-        }
         const selectedCategory = categoryFilterEl.value;
         const selectedRarity = rarityFilterEl.value;
+
         const filteredItems = allItems.filter(item => {
             const matchesSearch = item.name.toLowerCase().includes(searchTerm);
             const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
             const matchesRarity = selectedRarity === 'all' || item.tier === selectedRarity;
             return matchesSearch && matchesCategory && matchesRarity;
         });
+
         displayItems(filteredItems);
     }
 
@@ -150,40 +150,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FLIP ANALYSIS & DISPLAY ---
     async function handleItemClick(item) {
         resultTableNameEl.textContent = `${item.name} のフリップ情報`;
-        statusMessageEl.textContent = 'オークションデータとBazaarデータを検索中...';
+        statusMessageEl.textContent = 'Bazaarデータを検索中...';
         resultTableBodyEl.innerHTML = '';
 
         document.querySelectorAll('#item-list li').forEach(li => li.classList.remove('active'));
         const selectedLi = document.querySelector(`[data-item-id='${item.id}']`);
         if(selectedLi) selectedLi.classList.add('active');
 
-        const [auctions, bazaarData] = await Promise.all([
-            getAuctions(),
-            fetchBazaarData()
-        ]);
-
-        if (!auctions || !bazaarData) {
-            statusMessageEl.textContent = 'データ取得に失敗しました。';
+        const bazaarData = await fetchBazaarData();
+        if (!bazaarData) {
+            statusMessageEl.textContent = 'Bazaarデータの取得に失敗しました。';
             return;
         }
 
-        const itemAuctions = auctions.filter(auc => auc.item_name === item.name && auc.bin);
+        const itemAuctions = tradeableAuctions.filter(auc => auc.item_name === item.name && auc.bin);
         const bazaarProduct = bazaarData[item.id];
         
         const prices = [];
-        itemAuctions.forEach(auc => prices.push({ type: 'BIN', price: auc.starting_bid }));
+        itemAuctions.forEach(auc => prices.push({ type: 'BIN', price: auc.starting_bid, lore: auc.item_lore }));
         if (bazaarProduct) {
             if (bazaarProduct.buy_summary && bazaarProduct.buy_summary.length > 0) {
-                prices.push({ type: 'Bazaar Buy', price: bazaarProduct.buy_summary[0].pricePerUnit });
+                prices.push({ type: 'Bazaar Buy', price: bazaarProduct.buy_summary[0].pricePerUnit, lore: '' });
             }
             if (bazaarProduct.sell_summary && bazaarProduct.sell_summary.length > 0) {
-                prices.push({ type: 'Bazaar Sell', price: bazaarProduct.sell_summary[0].pricePerUnit });
+                prices.push({ type: 'Bazaar Sell', price: bazaarProduct.sell_summary[0].pricePerUnit, lore: '' });
             }
         }
 
         if (prices.length < 2) {
             statusMessageEl.textContent = 'フリップ可能な価格が見つかりませんでした。';
-            resultTableBodyEl.innerHTML = '<tr><td colspan="6">-</td></tr>';
+            resultTableBodyEl.innerHTML = '<tr><td colspan="7">-</td></tr>';
             return;
         }
 
@@ -191,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lowest = prices[0];
         const secondLowest = prices[1];
         const profit = secondLowest.price - lowest.price;
+        const enchants = parseEnchants(lowest.lore);
 
         statusMessageEl.textContent = `分析完了。`;
         const row = document.createElement('tr');
@@ -201,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${profit.toLocaleString()}</td>
             <td>${lowest.type}</td>
             <td>${secondLowest.type}</td>
+            <td>${enchants}</td>
         `;
         resultTableBodyEl.appendChild(row);
     }
@@ -208,33 +206,29 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleDisplayAllFlips() {
         displayFlipsBtn.disabled = true;
         displayFlipsBtn.textContent = '処理中...';
-        statusMessageEl.textContent = '全フリップ情報を検索しています...';
+        statusMessageEl.textContent = 'Bazaarデータを検索しています...';
         resultTableBodyEl.innerHTML = '';
         resultTableNameEl.textContent = "全フリップ情報";
 
-        const [auctions, bazaarData] = await Promise.all([
-            getAuctions(),
-            fetchBazaarData()
-        ]);
-
-        if (!auctions || !bazaarData) {
-            statusMessageEl.textContent = 'データ取得に失敗しました。';
+        const bazaarData = await fetchBazaarData();
+        if (!bazaarData) {
+            statusMessageEl.textContent = 'Bazaarデータの取得に失敗しました。';
             displayFlipsBtn.disabled = false;
             displayFlipsBtn.textContent = '全フリップを表示';
             return;
         }
 
         statusMessageEl.textContent = '利益の出るフリップを計算中...';
-        const allFlips = await findAllFlips(auctions, bazaarData);
+        const allFlips = await findAllFlips(tradeableAuctions, bazaarData);
 
         if (allFlips.length > 0) {
             statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。`;
-            localStorage.setItem(FLIPS_STORAGE_KEY, JSON.stringify(allFlips)); // Save to localStorage
-            displayFlipsInTable(allFlips);
+            localStorage.setItem(FLIPS_STORAGE_KEY, JSON.stringify(allFlips));
+            displayFlipsInTable(JSON.parse(savedFlips));
         } else {
             statusMessageEl.textContent = '利益の出るフリップは見つかりませんでした。';
-            localStorage.removeItem(FLIPS_STORAGE_KEY); // Clear storage if no flips found
-            resultTableBodyEl.innerHTML = '<tr><td colspan="6">-</td></tr>';
+            localStorage.removeItem(FLIPS_STORAGE_KEY);
+            resultTableBodyEl.innerHTML = '<tr><td colspan="7">-</td></tr>';
         }
 
         displayFlipsBtn.disabled = false;
@@ -245,10 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const profitableFlips = [];
         const itemPrices = new Map();
 
-        // Collect all prices from auctions and bazaar
         auctions.filter(a => a.bin).forEach(a => {
             if (!itemPrices.has(a.item_name)) itemPrices.set(a.item_name, []);
-            itemPrices.get(a.item_name).push({ type: 'BIN', price: a.starting_bid });
+            itemPrices.get(a.item_name).push({ type: 'BIN', price: a.starting_bid, lore: a.item_lore });
         });
 
         for (const productId in bazaarData) {
@@ -257,21 +250,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (itemName) {
                 if (!itemPrices.has(itemName)) itemPrices.set(itemName, []);
                  if (product.buy_summary && product.buy_summary.length > 0) {
-                    itemPrices.get(itemName).push({ type: 'Bazaar Buy', price: product.buy_summary[0].pricePerUnit });
+                    itemPrices.get(itemName).push({ type: 'Bazaar Buy', price: product.buy_summary[0].pricePerUnit, lore: '' });
                 }
                 if (product.sell_summary && product.sell_summary.length > 0) {
-                    itemPrices.get(itemName).push({ type: 'Bazaar Sell', price: product.sell_summary[0].pricePerUnit });
+                    itemPrices.get(itemName).push({ type: 'Bazaar Sell', price: product.sell_summary[0].pricePerUnit, lore: '' });
                 }
             }
         }
 
-        // Find flips for each item
         for (const [itemName, prices] of itemPrices.entries()) {
             if (prices.length >= 2) {
                 prices.sort((a, b) => a.price - b.price);
                 const lowest = prices[0];
                 const secondLowest = prices[1];
                 const profit = secondLowest.price - lowest.price;
+                const enchants = parseEnchants(lowest.lore);
 
                 if (profit > 0) {
                     profitableFlips.push({
@@ -280,7 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         secondLowestPrice: secondLowest.price,
                         profit,
                         source1: lowest.type,
-                        source2: secondLowest.type
+                        source2: secondLowest.type,
+                        enchants: enchants
                     });
                 }
             }
@@ -300,9 +294,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${flip.profit.toLocaleString()}</td>
                 <td>${flip.source1}</td>
                 <td>${flip.source2}</td>
+                <td>${flip.enchants}</td>
             `;
             resultTableBodyEl.appendChild(row);
         });
+    }
+
+    function parseEnchants(lore) {
+        if (!lore) return '';
+        const enchantLines = lore.split('\n').filter(line => line.startsWith('§9'));
+        return enchantLines.map(line => line.replace(/§[a-f0-9]/g, '')).join(', ');
     }
 
     function loadSavedFlips() {
@@ -314,6 +315,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function init() {
+        statusMessageEl.textContent = 'アプリケーションを初期化中... 取引可能なアイテムを読み込んでいます。';
+        try {
+            const results = await Promise.all([fetchAllItems(), getAndFilterAuctions()]);
+            tradeableAuctions = results[1];
+
+            if (!tradeableAuctions) {
+                throw new Error("オークションデータの取得に失敗しました。");
+            }
+
+            const tradeableItemNames = [...new Set(tradeableAuctions.map(auc => auc.item_name))];
+            allItems = allItems.filter(item => tradeableItemNames.includes(item.name));
+
+            populateFilters();
+            applyFilters();
+            loadSavedFlips();
+
+            statusMessageEl.textContent = `初期化完了。${allItems.length}個の取引可能なアイテムを読み込みました。`;
+
+        } catch (error) {
+            statusMessageEl.textContent = 'アプリケーションの初期化に失敗しました。ページを再読み込みしてください。';
+            console.error("Initialization failed:", error);
+        }
+    }
+
     // --- EVENT LISTENERS ---
     itemSearchEl.addEventListener('input', applyFilters);
     categoryFilterEl.addEventListener('change', applyFilters);
@@ -321,6 +347,5 @@ document.addEventListener('DOMContentLoaded', () => {
     displayFlipsBtn.addEventListener('click', handleDisplayAllFlips);
 
     // --- INITIAL LOAD ---
-    fetchAllItems();
-    loadSavedFlips();
+    init();
 });
