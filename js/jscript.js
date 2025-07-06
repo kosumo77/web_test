@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Constants
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
+    const HYPIXEL_API_KEY = '4fcf998e-10fd-4e6c-9826-5fe28f833a51'; // <--- ここにAPIキーを設定
     const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
     // State
@@ -63,7 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let page = 0;
         let totalPages = 1;
         while (page < totalPages) {
-            const response = await fetch(`${API_BASE_URL}/auctions?page=${page}`);
+            const response = await fetch(`${API_BASE_URL}/auctions?page=${page}`, {
+                headers: {
+                    'API-Key': HYPIXEL_API_KEY // APIキーをヘッダーに追加
+                }
+            });
             if (!response.ok) throw new Error(`API request failed on page ${page}`);
             const data = await response.json();
             if (!data.success) throw new Error('API call was not successful.');
@@ -77,7 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchBazaarData() {
         try {
-            const response = await fetch(`${API_BASE_URL}/bazaar`);
+            const response = await fetch(`${API_BASE_URL}/bazaar`, {
+                headers: {
+                    'API-Key': HYPIXEL_API_KEY // APIキーをヘッダーに追加
+                }
+            });
             if (!response.ok) {
                 throw new Error(`Bazaar APIの応答が不正です。ステータス: ${response.status} ${response.statusText}`);
             }

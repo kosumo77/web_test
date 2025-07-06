@@ -1,1 +1,32 @@
-このアプリケーションを実行するには、Webブラウザで 'index.html' ファイルを開いてください。
+これまでの操作詳細:
+
+1.  **最新の「gemini」コミットへのリセット:**
+    *   `git log --grep=gemini -n 1 --format=%H` を実行し、最新の「gemini」コミットのハッシュ (`83d20a9db324efc45133d73a967477ecc088c97d`) を取得しました。
+    *   `git reset --hard 83d20a9db324efc45133d73a967477ecc088c97d` を実行し、リポジトリをこのコミットの状態に戻しました。
+
+2.  **`run.txt` の作成と内容変更:**
+    *   当初、アプリケーションの実行方法を記述した `run.txt` を作成しました。
+    *   このファイルは現在、これまでの操作ログを記録するために使用されています。
+
+3.  **`GEMINI.md` の作成と内容変更:**
+    *   `GEMINI.md` が存在しなかったため、新しく作成し、`run.txt` を参照するように指示を記述しました。
+    *   `run.txt` の内容変更に伴い、`GEMINI.md` の指示も更新されます。
+
+4.  **`js/jscript.js` の変更:**
+    *   **フリップ情報の `localStorage` への保存機能の追加:**
+        *   `handleCsvDownload` 関数内で、計算されたフリップ情報 (`allFlips`) を `localStorage.setItem('profitableFlips', JSON.stringify(allFlips));` を使って保存するように変更しました。
+        *   ページロード時に保存されたフリップデータをコンソールに表示する `loadSavedFlips` 関数を追加し、初期ロード時に呼び出すようにしました。
+    *   **Hypixel APIキーの組み込み:**
+        *   `js/jscript.js` に `const HYPIXEL_API_KEY = 'YOUR_HYPIXEL_API_KEY';` を追加しました。
+        *   `fetchBazaarData` 関数と `fetchAllAuctionPages` 関数で、APIリクエストのヘッダーに `API-Key: HYPIXEL_API_KEY` を含めるように変更しました。
+        **重要:** `YOUR_HYPIXEL_API_KEY` の部分を、ご自身で取得したAPIキーに置き換える必要があります。
+
+---
+
+**アプリケーションの実行方法:**
+Webブラウザで `index.html` ファイルを開いてください。
+
+---
+
+**重要リマインダー:**
+`C:/Users/81904/Desktop/web_test/js/jscript.js` ファイル内の `YOUR_HYPIXEL_API_KEY` の部分を、**ご自身で取得したHypixel APIキーに置き換える必要があります。** これが完了しないと、アプリケーションはBazaarデータを正常に取得できません。
