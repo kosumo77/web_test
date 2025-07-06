@@ -349,9 +349,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const allFlips = await findAllFlips(auctions, bazaarData);
 
         if (allFlips.length > 0) {
-            statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。CSVを生成しています...`;
-            exportToCsv(allFlips);
-            statusMessageEl.textContent = 'CSVファイルのダウンロードが開始されました。';
+            statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。データを保存しています...`;
+            localStorage.setItem('profitableFlips', JSON.stringify(allFlips)); // Save to localStorage
+            statusMessageEl.textContent = 'フリップデータが保存されました。';
+            exportToCsv(allFlips); // Keep CSV export as well
         } else {
             statusMessageEl.textContent = '利益の出るフリップは見つかりませんでした。';
         }
@@ -368,4 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIAL LOAD ---
     fetchAllItems();
+
+    // Function to load and display saved flips (for debugging/verification)
+    function loadSavedFlips() {
+        const savedFlips = localStorage.getItem('profitableFlips');
+        if (savedFlips) {
+            console.log('保存されたフリップデータ:', JSON.parse(savedFlips));
+            // You can add logic here to display these flips in the UI if needed
+        }
+    }
+
+    loadSavedFlips(); // Call on initial load
 });
