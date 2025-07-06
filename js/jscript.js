@@ -75,6 +75,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return allAuctions;
     }
 
+    async function fetchBazaarData() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/bazaar`);
+            if (!response.ok) {
+                throw new Error(`Bazaar APIの応答が不正です。ステータス: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error('Bazaar API call was not successful.');
+            }
+            return data.products;
+        } catch (error) {
+            console.error("Failed to fetch Bazaar data:", error);
+            return null;
+        }
+    }
+
     // --- UI & FILTERING ---
     function populateFilters() {
         const categories = [...new Set(allItems.map(item => item.category))].sort();
@@ -131,61 +148,90 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FLIP ANALYSIS & DISPLAY ---
     async function handleItemClick(item) {
         resultTableNameEl.textContent = `${item.name} のフリップ情報`;
-        statusMessageEl.textContent = 'オークションデータを検索中...';
+        statusMessageEl.textContent = 'オークションデータとBazaarデータを検索中...';
         resultTableBodyEl.innerHTML = '';
 
         document.querySelectorAll('#item-list li').forEach(li => li.classList.remove('active'));
         const selectedLi = document.querySelector(`[data-item-id='${item.id}']`);
         if(selectedLi) selectedLi.classList.add('active');
 
-        const auctions = await getAuctionsWithCache();
+        const [auctions, bazaarData] = await Promise.all([
+            getAuctionsWithCache(),
+            fetchBazaarData()
+        ]);
+
         if (!auctions) {
             statusMessageEl.textContent = 'オークションデータの取得に失敗しました。';
             return;
         }
+        if (!bazaarData) {
+            statusMessageEl.textContent = 'Bazaarデータの取得に失敗しました。';
+            return;
+        }
 
         const itemAuctions = auctions.filter(auc => auc.item_name === item.name && auc.bin);
-        findAndDisplaySingleFlip(itemAuctions);
+        findAndDisplayFlip(itemAuctions, bazaarData[item.id]);
     }
 
-    function findAndDisplaySingleFlip(auctions) {
-        if (auctions.length < 2) {
-            statusMessageEl.textContent = 'フリップ可能なオークションが見つかりませんでした (出品が2つ未満)。';
+    function findAndDisplayFlip(auctions, bazaarProduct) {
+        const prices = [];
+
+        // Add BIN auction prices
+        auctions.forEach(auc => prices.push({ type: 'BIN', price: auc.starting_bid, uuid: auc.uuid }));
+
+        // Add Bazaar prices
+        if (bazaarProduct) {
+            // Buy price (what you pay to buy from Bazaar)
+            if (bazaarProduct.buy_summary && bazaarProduct.buy_summary.length > 0) {
+                prices.push({ type: 'Bazaar Buy', price: bazaarProduct.buy_summary[0].pricePerUnit });
+            }
+            // Sell price (what you get when selling to Bazaar)
+            if (bazaarProduct.sell_summary && bazaarProduct.sell_summary.length > 0) {
+                prices.push({ type: 'Bazaar Sell', price: bazaarProduct.sell_summary[0].pricePerUnit });
+            }
+        }
+
+        if (prices.length < 2) {
+            statusMessageEl.textContent = 'フリップ可能な価格が見つかりませんでした (価格データが2つ未満)。';
             resultTableBodyEl.innerHTML = '<tr><td colspan="4">-</td></tr>';
             return;
         }
 
-        const sortedAuctions = auctions.sort((a, b) => a.starting_bid - b.starting_bid);
-        const lowestPrice = sortedAuctions[0].starting_bid;
-        const secondLowestPrice = sortedAuctions[1].starting_bid;
-        const profit = secondLowestPrice - lowestPrice;
+        prices.sort((a, b) => a.price - b.price);
 
-        statusMessageEl.textContent = `分析完了。出品数: ${auctions.length}件`;
+        const lowest = prices[0];
+        const secondLowest = prices[1];
+        const profit = secondLowest.price - lowest.price;
+
+        statusMessageEl.textContent = `分析完了。価格データ数: ${prices.length}件`;
         resultTableBodyEl.innerHTML = '';
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${lowestPrice.toLocaleString()}</td>
-            <td>${secondLowestPrice.toLocaleString()}</td>
+            <td>${lowest.price.toLocaleString()} (${lowest.type})</td>
+            <td>${secondLowest.price.toLocaleString()} (${secondLowest.type})</td>
             <td>${profit.toLocaleString()}</td>
-            <td>${sortedAuctions[0].uuid}</td>
+            <td>${lowest.uuid || '-'}</td>
         `;
         resultTableBodyEl.appendChild(row);
     }
 
     // --- CSV EXPORT ---
-    function findAllFlips(auctions) {
+    async function findAllFlips(auctions, bazaarData) {
+        const profitableFlips = [];
+        const processedItems = new Set(); // To avoid duplicate processing for items
+
+        // Process BIN auctions
         const binAuctions = auctions.filter(auction => auction.bin);
-        const itemMap = new Map();
+        const itemAuctionPrices = new Map(); // Map: item_name -> array of BIN prices
 
         for (const auction of binAuctions) {
-            if (!itemMap.has(auction.item_name)) {
-                itemMap.set(auction.item_name, []);
+            if (!itemAuctionPrices.has(auction.item_name)) {
+                itemAuctionPrices.set(auction.item_name, []);
             }
-            itemMap.get(auction.item_name).push(auction.starting_bid);
+            itemAuctionPrices.get(auction.item_name).push(auction.starting_bid);
         }
 
-        const profitableFlips = [];
-        for (const [itemName, prices] of itemMap.entries()) {
+        for (const [itemName, prices] of itemAuctionPrices.entries()) {
             if (prices.length >= 2) {
                 prices.sort((a, b) => a - b);
                 const lowestPrice = prices[0];
@@ -197,16 +243,59 @@ document.addEventListener('DOMContentLoaded', () => {
                         itemName,
                         lowestPrice,
                         secondLowestPrice,
-                        profit
+                        profit,
+                        source1: 'BIN',
+                        source2: 'BIN'
+                    });
+                }
+            }
+            processedItems.add(itemName);
+        }
+
+        // Process Bazaar items and compare with BIN if applicable
+        for (const productId in bazaarData) {
+            const bazaarProduct = bazaarData[productId];
+            const itemName = allItems.find(item => item.id === productId)?.name;
+
+            if (!itemName || processedItems.has(itemName)) continue; // Skip if already processed via BIN or item name not found
+
+            const prices = [];
+            if (bazaarProduct.buy_summary && bazaarProduct.buy_summary.length > 0) {
+                prices.push({ type: 'Bazaar Buy', price: bazaarProduct.buy_summary[0].pricePerUnit });
+            }
+            if (bazaarProduct.sell_summary && bazaarProduct.sell_summary.length > 0) {
+                prices.push({ type: 'Bazaar Sell', price: bazaarProduct.sell_summary[0].pricePerUnit });
+            }
+
+            // Also include BIN prices if available for this item
+            if (itemAuctionPrices.has(itemName)) {
+                itemAuctionPrices.get(itemName).forEach(price => prices.push({ type: 'BIN', price: price }));
+            }
+
+            if (prices.length >= 2) {
+                prices.sort((a, b) => a.price - b.price);
+                const lowest = prices[0];
+                const secondLowest = prices[1];
+                const profit = secondLowest.price - lowest.price;
+
+                if (profit > 0) {
+                    profitableFlips.push({
+                        itemName,
+                        lowestPrice: lowest.price,
+                        secondLowestPrice: secondLowest.price,
+                        profit,
+                        source1: lowest.type,
+                        source2: secondLowest.type
                     });
                 }
             }
         }
+
         return profitableFlips.sort((a, b) => b.profit - a.profit);
     }
 
     function exportToCsv(flips) {
-        const headers = ['Item Name', 'Lowest Price', 'Second Lowest Price', 'Profit'];
+        const headers = ['Item Name', 'Lowest Price', 'Second Lowest Price', 'Profit', 'Source 1', 'Source 2'];
         const csvRows = [headers.join(',')];
 
         for (const flip of flips) {
@@ -214,12 +303,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 `"${flip.itemName.replace(/"/g, '""')}"`,
                 flip.lowestPrice,
                 flip.secondLowestPrice,
-                flip.profit
+                flip.profit,
+                flip.source1,
+                flip.source2
             ];
             csvRows.push(values.join(','));
         }
 
-        const csvString = csvRows.join('\n');
+        const csvString = csvRows.join('
+');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -236,16 +328,26 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadCsvBtn.textContent = '処理中...';
         statusMessageEl.textContent = '全フリップ情報を検索しています...';
 
-        const auctions = await getAuctionsWithCache();
+        const [auctions, bazaarData] = await Promise.all([
+            getAuctionsWithCache(),
+            fetchBazaarData()
+        ]);
+
         if (!auctions) {
             statusMessageEl.textContent = 'オークションデータの取得に失敗しました。';
             downloadCsvBtn.disabled = false;
             downloadCsvBtn.textContent = '全フリップをCSVでダウンロード';
             return;
         }
+        if (!bazaarData) {
+            statusMessageEl.textContent = 'Bazaarデータの取得に失敗しました。';
+            downloadCsvBtn.disabled = false;
+            downloadCsvBtn.textContent = '全フリップをCSVでダウンロード';
+            return;
+        }
 
         statusMessageEl.textContent = '利益の出るフリップを計算中...';
-        const allFlips = findAllFlips(auctions);
+        const allFlips = await findAllFlips(auctions, bazaarData);
 
         if (allFlips.length > 0) {
             statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。CSVを生成しています...`;
