@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAllItems() {
         try {
             // Use Hypixel API for items to avoid CORS issues
-            const response = await fetch(`${API_BASE_URL}/items`, {
+            const response = await fetch(`https://api.hypixel.net/resources/skyblock/items`, {
                  headers: {
                     'API-Key': HYPIXEL_API_KEY
                 }
