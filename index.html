@@ -7,23 +7,45 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <h1>Hypixel AH Flip Finder</h1>
-    <p>下のボタンを押して、利益が見込めるフリップ対象を検索します。</p>
-    <button id="fetch-btn">フリップ対象を検索</button>
-    <div id="result-container">
-        <table id="result-table">
-            <thead>
-                <tr>
-                    <th>アイテム名</th>
-                    <th>最安値 (BIN)</th>
-                    <th>2番目に安い価格 (BIN)</th>
-                    <th>利益</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 結果はここに表示されます -->
-            </tbody>
-        </table>
+    <div class="container">
+        <aside class="sidebar">
+            <h2>アイテム検索</h2>
+            <input type="text" id="item-search" placeholder="アイテム名で検索...">
+            <div class="filter-container">
+                <select id="category-filter">
+                    <option value="all">すべてのカテゴリー</option>
+                </select>
+                <select id="rarity-filter">
+                    <option value="all">すべてのレアリティ</option>
+                </select>
+            </div>
+            <ul id="item-list">
+                <!-- アイテムリストはここに表示されます -->
+            </ul>
+        </aside>
+        <main class="main-content">
+            <header>
+                <h1>Hypixel AH Flip Finder</h1>
+                <p>サイドバーからアイテムを選択して、フリップ情報を表示します。</p>
+            </header>
+            <div id="result-container">
+                <h2 id="result-item-name">結果</h2>
+                <p id="status-message">アイテムを選択してください。</p>
+                <table id="result-table">
+                    <thead>
+                        <tr>
+                            <th>最安値 (BIN)</th>
+                            <th>2番目に安い価格 (BIN)</th>
+                            <th>利益</th>
+                            <th>UUID (デバッグ用)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 結果はここに表示されます -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
     </div>
     <script src="js/jscript.js"></script>
 </body>
