@@ -89,8 +89,28 @@ body {
 
 header {
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
+    padding-bottom: 20px;
     margin-bottom: 20px;
+}
+
+.header-btn {
+    background-color: var(--highlight-color);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.header-btn:hover {
+    opacity: 0.9;
+}
+
+.header-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
 }
 
 #result-container {
