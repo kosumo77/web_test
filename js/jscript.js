@@ -19,16 +19,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATA FETCHING ---
     async function fetchAllItems() {
         try {
-            const response = await fetch('https://api.slothpixel.me/api/skyblock/items');
+            // Use Hypixel API for items to avoid CORS issues
+            const response = await fetch(`${API_BASE_URL}/items`, {
+                 headers: {
+                    'API-Key': HYPIXEL_API_KEY
+                }
+            });
             if (!response.ok) {
                 throw new Error(`APIの応答が不正です。ステータス: ${response.status} ${response.statusText}`);
             }
             const itemsData = await response.json();
-            allItems = Object.entries(itemsData).map(([id, data]) => ({
-                id,
-                name: data.name,
-                category: data.category || 'MISC',
-                tier: data.tier || 'COMMON'
+            if (!itemsData.success) {
+                 throw new Error('Item API call was not successful.');
+            }
+            allItems = itemsData.items.map(item => ({
+                id: item.id,
+                name: item.name,
+                category: item.category || 'MISC',
+                tier: item.tier || 'COMMON'
             }));
             populateFilters();
             applyFilters();
