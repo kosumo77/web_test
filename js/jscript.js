@@ -63,6 +63,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return allData.filter(auc => !auc.item_lore.includes('Soulbound'));
     }
 
+    async function fetchMinimalAuctionDataForFlips() {
+        let allData = [];
+        let page = 0;
+        let total = 1;
+        statusMessageEl.textContent = 'フリップ分析用オークションデータを取得中... (0%)';
+        while (page < total) {
+            const data = await fetchAuctionPage(page);
+            // Extract only necessary fields to reduce memory footprint
+            const minimalAuctions = data.auctions.map(auc => ({
+                item_name: auc.item_name,
+                starting_bid: auc.starting_bid,
+                item_lore: auc.item_lore,
+                bin: auc.bin
+            })).filter(auc => !auc.item_lore.includes('Soulbound'));
+            allData = allData.concat(minimalAuctions);
+            total = data.totalPages;
+            page++;
+            statusMessageEl.textContent = `フリップ分析用オークションデータを取得中... (${Math.round((page / total) * 100)}%)`;
+            await new Promise(res => setTimeout(res, 100));
+        }
+        return allData;
+    }
+
     async function fetchBazaarData() {
         try {
             const response = await fetch(`${API_BASE_URL}/bazaar`, { headers: { 'API-Key': HYPIXEL_API_KEY } });
@@ -131,19 +154,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ANALYSIS & DISPLAY ---
     async function handleItemClick(item) {
-        // This function can be used to show a summary for a single item if needed in the future.
-        // For now, we focus on the main tabs.
         statusMessageEl.textContent = `アイテム「${item.name}」の情報を表示しています。`;
     }
 
     async function handleAnalyzeFlips() {
         analyzeFlipsBtn.disabled = true;
         analyzeFlipsBtn.textContent = '分析中...';
-        statusMessageEl.textContent = '全オークションデータを取得中... (数分かかる場合があります)';
+        statusMessageEl.textContent = 'フリップ分析用オークションデータを取得中... (数分かかる場合があります)';
         flipTableBodyEl.innerHTML = '';
 
-        const allAuctions = await fetchAllAuctionData();
-        if (!allAuctions) {
+        const minimalAuctions = await fetchMinimalAuctionDataForFlips();
+        if (!minimalAuctions) {
             statusMessageEl.textContent = 'オークションデータの取得に失敗しました。';
             analyzeFlipsBtn.disabled = false;
             analyzeFlipsBtn.textContent = 'フリップを分析';
@@ -160,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         statusMessageEl.textContent = '利益の出るフリップを計算中...';
-        const allFlips = await findAllFlips(allAuctions, bazaarData);
+        const allFlips = await findAllFlips(minimalAuctions, bazaarData);
 
         if (allFlips.length > 0) {
             statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。`;
@@ -169,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             statusMessageEl.textContent = '利益の出るフリップは見つかりませんでした。';
             localStorage.removeItem(FLIPS_STORAGE_KEY);
-            flipTableBodyEl.innerHTML = '<tr><td colspan="7">-</td></tr>';
+            flipTableBodyEl.innerHTML = '<tr><td colspan="8">-</td></tr>';
         }
         
         document.querySelector('[data-tab="flip-analyzer"]').click();
@@ -208,9 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const secondLowest = prices[1];
                 const profit = secondLowest.price - lowest.price;
                 const enchants = parseEnchants(lowest.lore);
+                const enchantmentValue = calculateEnchantmentValue(enchants, bazaarData);
 
                 if (profit > 0) {
-                    profitableFlips.push({ itemName, lowestPrice: lowest.price, secondLowestPrice: secondLowest.price, profit, source1: lowest.type, source2: lowest.type, enchants });
+                    profitableFlips.push({ itemName, lowestPrice: lowest.price, secondLowestPrice: secondLowest.price, profit, source1: lowest.type, source2: lowest.type, enchants: enchants.map(e => `${e.name} ${e.level}`).join(', '), enchantmentValue });
                 }
             }
         }
@@ -226,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             row.innerHTML = `
                 <td>${auc.item_name}</td>
                 <td>${auc.starting_bid.toLocaleString()}</td>
-                <td>${enchants}</td>
+                <td>${enchants.map(e => `${e.name} ${e.level}`).join(', ')}</td>
                 <td>${timeLeft}</td>
                 <td>${auc.auctioneer}</td>
             `;
@@ -246,15 +268,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${flip.source1}</td>
                 <td>${flip.source2}</td>
                 <td>${flip.enchants}</td>
+                <td>${flip.enchantmentValue.toLocaleString()}</td>
             `;
             flipTableBodyEl.appendChild(row);
         });
     }
 
     function parseEnchants(lore) {
-        if (!lore) return '';
+        if (!lore) return [];
         const enchantLines = lore.split('\n').filter(line => line.includes('§9'));
-        return enchantLines.map(line => line.replace(/§[a-f0-9]/g, '').trim()).join(', ');
+        const enchants = [];
+        const romanToNumber = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
+
+        enchantLines.forEach(line => {
+            const cleanLine = line.replace(/§[a-f0-9]/g, '').trim();
+            const parts = cleanLine.split(' ');
+            const levelRoman = parts.pop();
+            const name = parts.join(' ');
+            const level = romanToNumber[levelRoman] || 0;
+            if (name && level > 0) {
+                enchants.push({ name, level });
+            }
+        });
+        return enchants;
+    }
+
+    function getEnchantmentBookPrice(enchantment, bazaarData) {
+        const productId = `ENCHANTED_BOOK:${enchantment.name.toUpperCase().replace(/ /g, '_')}_${enchantment.level}`;
+        if (bazaarData[productId] && bazaarData[productId].buy_summary && bazaarData[productId].buy_summary.length > 0) {
+            return bazaarData[productId].buy_summary[0].pricePerUnit;
+        }
+        // Fallback: Try to find in auctions if not in bazaar (simplified for now)
+        // This would require iterating through all auctions for enchanted books, which is very slow.
+        // For now, we'll only use Bazaar for enchantment book prices.
+        return 0;
+    }
+
+    function calculateEnchantmentValue(enchants, bazaarData) {
+        let totalValue = 0;
+        enchants.forEach(enchant => {
+            totalValue += getEnchantmentBookPrice(enchant, bazaarData);
+        });
+        return totalValue;
     }
     
     function formatTimeLeft(ms) {
@@ -276,68 +331,6 @@ document.addEventListener('DOMContentLoaded', () => {
             displayFlipsInTable(JSON.parse(savedFlips));
             document.querySelector('[data-tab="flip-analyzer"]').click();
         }
-    }
-
-    async function loadMoreAuctions() {
-        loadMoreAuctionsBtn.disabled = true;
-        loadMoreAuctionsBtn.textContent = '読み込み中...';
-        statusMessageEl.textContent = `オークションデータを読み込み中... (ページ ${currentAuctionPage + 1}/${totalAuctionPages})`;
-
-        try {
-            const data = await fetchAuctionPage(currentAuctionPage);
-            totalAuctionPages = data.totalPages;
-            const newAuctions = data.auctions.filter(auc => !auc.item_lore.includes('Soulbound'));
-            tradeableAuctions = tradeableAuctions.concat(newAuctions);
-            
-            // Append to table, don't clear
-            newAuctions.forEach(auc => {
-                const row = document.createElement('tr');
-                const enchants = parseEnchants(auc.item_lore);
-                const timeLeft = formatTimeLeft(auc.end - Date.now());
-                row.innerHTML = `
-                    <td>${auc.item_name}</td>
-                    <td>${auc.starting_bid.toLocaleString()}</td>
-                    <td>${enchants}</td>
-                    <td>${timeLeft}</td>
-                    <td>${auc.auctioneer}</td>
-                `;
-                auctionTableBodyEl.appendChild(row);
-            });
-
-            currentAuctionPage++;
-            if (currentAuctionPage >= totalAuctionPages) {
-                loadMoreAuctionsBtn.disabled = true;
-                loadMoreAuctionsBtn.textContent = 'すべてのオークションを読み込みました';
-                statusMessageEl.textContent = `すべてのオークション (${tradeableAuctions.length}件) を読み込みました。`;
-            } else {
-                loadMoreAuctionsBtn.disabled = false;
-                loadMoreAuctionsBtn.textContent = 'もっと読み込む';
-                statusMessageEl.textContent = `オークションデータを読み込みました。次へ: ページ ${currentAuctionPage + 1}/${totalAuctionPages}`; 
-            }
-        } catch (error) {
-            statusMessageEl.textContent = 'オークションデータの読み込みに失敗しました。';
-            console.error("Load more auctions failed:", error);
-            loadMoreAuctionsBtn.disabled = false;
-            loadMoreAuctionsBtn.textContent = '読み込み失敗 - 再試行';
-        }
-    }
-
-    function downloadAuctions() {
-        if (tradeableAuctions.length === 0) {
-            statusMessageEl.textContent = 'ダウンロードするオークションデータがありません。';
-            return;
-        }
-        const dataStr = JSON.stringify(tradeableAuctions, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'hypixel_auctions.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        statusMessageEl.textContent = `${tradeableAuctions.length}件のオークションデータをダウンロードしました。`;
     }
 
     async function init() {

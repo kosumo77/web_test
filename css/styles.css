@@ -154,14 +154,34 @@ header {
 
 table {
     width: 100%;
+    table-layout: fixed; /* 列幅を固定する */
     border-collapse: collapse;
     margin-top: 20px;
 }
+
+/* オークション閲覧テーブルの列幅 */
+#auction-table th:nth-child(1), #auction-table td:nth-child(1) { width: 30%; } /* アイテム名 */
+#auction-table th:nth-child(2), #auction-table td:nth-child(2) { width: 15%; } /* 価格 */
+#auction-table th:nth-child(3), #auction-table td:nth-child(3) { width: 25%; } /* エンチャント */
+#auction-table th:nth-child(4), #auction-table td:nth-child(4) { width: 15%; } /* 残り時間 */
+#auction-table th:nth-child(5), #auction-table td:nth-child(5) { width: 15%; } /* 出品者 */
+
+/* フリップ分析テーブルの列幅 */
+#flip-table th:nth-child(1), #flip-table td:nth-child(1) { width: 25%; } /* アイテム名 */
+#flip-table th:nth-child(2), #flip-table td:nth-child(2) { width: 12%; } /* 最安値 */
+#flip-table th:nth-child(3), #flip-table td:nth-child(3) { width: 12%; } /* 2番目に安い価格 */
+#flip-table th:nth-child(4), #flip-table td:nth-child(4) { width: 12%; } /* 利益 */
+#flip-table th:nth-child(5), #flip-table td:nth-child(5) { width: 12%; } /* 購入元 */
+#flip-table th:nth-child(6), #flip-table td:nth-child(6) { width: 12%; } /* 売却先 */
+#flip-table th:nth-child(7), #flip-table td:nth-child(7) { width: 15%; } /* エンチャント */
 
 th, td {
     border: 1px solid var(--border-color);
     padding: 12px;
     text-align: left;
+    overflow: hidden; /* はみ出たテキストを隠す */
+    text-overflow: ellipsis; /* はみ出たテキストを...で表示 */
+    white-space: nowrap; /* テキストを折り返さない */
 }
 
 th {
