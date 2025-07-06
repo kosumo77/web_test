@@ -1,6 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypixel AH Flip Finder</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
 <body>
-<h1>Hello World</h1>
+    <h1>Hypixel AH Flip Finder</h1>
+    <p>下のボタンを押して、利益が見込めるフリップ対象を検索します。</p>
+    <button id="fetch-btn">フリップ対象を検索</button>
+    <div id="result-container">
+        <table id="result-table">
+            <thead>
+                <tr>
+                    <th>アイテム名</th>
+                    <th>最安値 (BIN)</th>
+                    <th>2番目に安い価格 (BIN)</th>
+                    <th>利益</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 結果はここに表示されます -->
+            </tbody>
+        </table>
+    </div>
+    <script src="js/jscript.js"></script>
 </body>
 </html>
