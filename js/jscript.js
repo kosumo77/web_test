@@ -94,6 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyFilters() {
         const searchTerm = itemSearchEl.value.toLowerCase();
+
+        // If search term is empty, show all items, ignoring other filters.
+        if (searchTerm === '') {
+            displayItems(allItems);
+            return;
+        }
+
+        // If search term is present, filter by all criteria.
         const selectedCategory = categoryFilterEl.value;
         const selectedRarity = rarityFilterEl.value;
 
@@ -103,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const matchesRarity = selectedRarity === 'all' || item.tier === selectedRarity;
             return matchesSearch && matchesCategory && matchesRarity;
         });
+
         displayItems(filteredItems);
     }
 
