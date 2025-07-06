@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Constants
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
-    const HYPIXEL_API_KEY = '4fcf998e-10fd-4e6c-9826-5fe28f833a51'; // <--- ここにAPIキーを設定
+    const HYPIXEL_API_KEY = 'd2a69c60-079c-44a4-bac1-f61bb3411ed9'; // <--- ここにAPIキーを設定
     const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
     // State
