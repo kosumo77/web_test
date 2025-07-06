@@ -12,12 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Constants
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
     const HYPIXEL_API_KEY = 'd2a69c60-079c-44a4-bac1-f61bb3411ed9'; // <--- ここにAPIキーを設定
-    const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
     // State
     let allItems = [];
 
-    // --- DATA FETCHING & CACHING ---
+    // --- DATA FETCHING ---
     async function fetchAllItems() {
         try {
             const response = await fetch('https://api.slothpixel.me/api/skyblock/items');
@@ -39,22 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function getAuctionsWithCache() {
-        const cachedData = JSON.parse(localStorage.getItem('auctionCache'));
-        const now = new Date().getTime();
-
-        if (cachedData && (now - cachedData.timestamp < CACHE_DURATION)) {
-            statusMessageEl.textContent = 'キャッシュからデータを読み込みました。';
-            return cachedData.auctions;
-        }
-
+    async function getAuctions() {
         statusMessageEl.textContent = 'APIから全オークションを取得中... (数分かかる場合があります)';
         try {
             const allAuctions = await fetchAllAuctionPages();
-            localStorage.setItem('auctionCache', JSON.stringify({ timestamp: new Date().getTime(), auctions: allAuctions }));
             return allAuctions;
         } catch (error) {
             console.error('Failed to fetch all auctions:', error);
+            statusMessageEl.textContent = `オークションデータの取得に失敗しました: ${error.message}`;
             return null;
         }
     }
@@ -165,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(selectedLi) selectedLi.classList.add('active');
 
         const [auctions, bazaarData] = await Promise.all([
-            getAuctionsWithCache(),
+            getAuctions(),
             fetchBazaarData()
         ]);
 
@@ -319,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
             csvRows.push(values.join(','));
         }
 
-        const csvString = csvRows.join('');
+        const csvString = csvRows.join('\r\n');
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -337,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusMessageEl.textContent = '全フリップ情報を検索しています...';
 
         const [auctions, bazaarData] = await Promise.all([
-            getAuctionsWithCache(),
+            getAuctions(),
             fetchBazaarData()
         ]);
 
@@ -358,10 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const allFlips = await findAllFlips(auctions, bazaarData);
 
         if (allFlips.length > 0) {
-            statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。データを保存しています...`;
-            localStorage.setItem('profitableFlips', JSON.stringify(allFlips)); // Save to localStorage
-            statusMessageEl.textContent = 'フリップデータが保存されました。';
-            exportToCsv(allFlips); // Keep CSV export as well
+            statusMessageEl.textContent = `${allFlips.length}件のフリップが見つかりました。CSVを生成しています...`;
+            exportToCsv(allFlips);
         } else {
             statusMessageEl.textContent = '利益の出るフリップは見つかりませんでした。';
         }
@@ -378,15 +367,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- INITIAL LOAD ---
     fetchAllItems();
-
-    // Function to load and display saved flips (for debugging/verification)
-    function loadSavedFlips() {
-        const savedFlips = localStorage.getItem('profitableFlips');
-        if (savedFlips) {
-            console.log('保存されたフリップデータ:', JSON.parse(savedFlips));
-            // You can add logic here to display these flips in the UI if needed
-        }
-    }
-
-    loadSavedFlips(); // Call on initial load
 });
