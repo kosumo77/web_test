@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabContents = document.querySelectorAll('.tab-content');
     const loadMoreAuctionsBtn = document.getElementById('load-more-auctions-btn');
     const downloadAuctionsBtn = document.getElementById('download-auctions-btn');
+    const clearAuctionsBtn = document.getElementById('clear-auctions-btn'); // New element selection
 
     // --- Constants ---
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
@@ -155,6 +156,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ANALYSIS & DISPLAY ---
     async function handleItemClick(item) {
         statusMessageEl.textContent = `アイテム「${item.name}」の情報を表示しています。`;
+        // Filter tradeableAuctions by item.name and display in auctionTableBodyEl
+        const filteredAuctions = tradeableAuctions.filter(auc => auc.item_name === item.name);
+        displayAuctionsInTable(filteredAuctions);
+        document.querySelector('[data-tab="auction-browser"]').click();
+        statusMessageEl.textContent = `${item.name} のオークション情報を表示しました。`;
+        // Disable load more and download buttons when filtered
+        if (loadMoreAuctionsBtn) loadMoreAuctionsBtn.disabled = true;
+        if (downloadAuctionsBtn) downloadAuctionsBtn.disabled = true;
+        if (clearAuctionsBtn) clearAuctionsBtn.disabled = true; // Disable clear button as well
     }
 
     async function handleAnalyzeFlips() {
@@ -333,6 +343,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function clearAuctions() {
+        tradeableAuctions = [];
+        auctionTableBodyEl.innerHTML = '';
+        currentAuctionPage = 0;
+        totalAuctionPages = 1;
+        if (loadMoreAuctionsBtn) {
+            loadMoreAuctionsBtn.disabled = false;
+            loadMoreAuctionsBtn.textContent = 'もっと読み込む';
+        }
+        statusMessageEl.textContent = '読み込み済みオークションデータをクリアしました。';
+        // Re-enable other buttons if they were disabled by item click
+        if (downloadAuctionsBtn) downloadAuctionsBtn.disabled = false;
+        if (clearAuctionsBtn) clearAuctionsBtn.disabled = false;
+    }
+
     async function init() {
         statusMessageEl.textContent = 'アプリケーションを初期化中...';
         setupTabs();
@@ -366,6 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (downloadAuctionsBtn) {
         downloadAuctionsBtn.addEventListener('click', downloadAuctions);
+    }
+    if (clearAuctionsBtn) { // New event listener for clear button
+        clearAuctionsBtn.addEventListener('click', clearAuctions);
     }
 
     // --- INITIAL LOAD ---
