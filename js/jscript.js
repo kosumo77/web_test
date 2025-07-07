@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Constants ---
     const API_BASE_URL = 'https://api.hypixel.net/skyblock';
-    const HYPIXEL_API_KEY = 'd2a69c60-079c-44a4-bac1-f61bb3411ed9';
+    const HYPIXEL_API_KEY = '547b72b2-3434-4404-a33f-a0ac22835c90';
     const FLIPS_STORAGE_KEY = 'profitableFlips';
 
     // --- State ---
